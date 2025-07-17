@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 // The CSS is in a separate immersive block named 'script-app-css'.
-import './src/script-app-css.css';
+import './script-app-css.css';
 
 // --- Initial Data Model for Sentence Bank ---
 const initialSentenceBank = [
