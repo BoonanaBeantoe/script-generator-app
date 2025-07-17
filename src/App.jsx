@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 // The CSS is in a separate immersive block named 'script-app-css'.
 import './script-app-css.css';
@@ -272,20 +271,20 @@ function App() {
   // New state for session context
   const [sessionContext, setSessionContext] = useState(sessionContextOptions.oneToOne); // Default to one-to-one
 
-  // States for drag and drop
+  // States for drag and drop (mouse)
   const [draggedItemIndex, setDraggedItemIndex] = useState(null);
   const [dragOverItemIndex, setDragOverItemIndex] = useState(null);
 
   // Touch-specific drag states
-  const [touchDraggedItem, setTouchDraggedItem] = useState(null); // The actual DOM element being dragged
-  const [touchStartPos, setTouchStartPos] = useState({ x: 0, y: 0 });
-  const [touchCurrentPos, setTouchCurrentPos] = useState({ x: 0, y: 0 });
-  const [touchTargetIndex, setTouchTargetIndex] = useState(null);
+  const [touchDraggingIndex, setTouchDraggingIndex] = useState(null); // The index of the item being touched/dragged
+  const [touchStartCoords, setTouchStartCoords] = useState({ x: 0, y: 0 }); // Initial touch coordinates
+  const [touchCurrentCoords, setTouchCurrentCoords] = useState({ x: 0, y: 0 }); // Current touch coordinates
+  const [isTouchDragging, setIsTouchDragging] = useState(false); // Flag to indicate active touch drag
+  const touchListItemRefs = useRef([]); // Refs for all list items to get their positions
 
+  const DRAG_THRESHOLD = 10; // Pixels to move before a drag is initiated
 
   // Effect to update generatedScriptOutput whenever selectedSentencesData or sentenceBank changes
-  // This effect now ONLY updates the contentEditable div's innerText if it's not focused.
-  // It also updates the generatedScriptOutput state for character count/copy.
   useEffect(() => {
     const newScript = generateFinalScript();
     if (contentEditableRef.current && document.activeElement !== contentEditableRef.current) {
@@ -310,8 +309,6 @@ function App() {
 
 
   // Effect to restore caret position after re-render
-  // This effect is still needed for when the contentEditable div *is* focused and its content is changed
-  // (e.g., by typing), to ensure the cursor stays in place.
   useEffect(() => {
     if (contentEditableRef.current && document.activeElement === contentEditableRef.current) {
       try {
@@ -333,7 +330,7 @@ function App() {
         contentEditableRef.current.focus(); // Fallback to just focusing
       }
     }
-  }, [caretPosition]); // Only depend on caretPosition, as generatedScriptOutput changes would cause re-render issues
+  }, [caretPosition]);
 
 
   // Function to add a new sentence to the sentenceBank
@@ -500,95 +497,95 @@ function App() {
   // --- End Drag and Drop Handlers (Mouse) ---
 
   // --- Touch Drag and Drop Handlers ---
-  const touchDragItemRef = useRef(null); // Ref for the currently touched/dragged item's DOM node
-
-  const getElementIndex = (element) => {
-    if (!element || !element.parentNode) return -1;
-    return Array.from(element.parentNode.children).indexOf(element);
-  };
-
   const handleTouchStart = (e, index) => {
-    // Only allow single touch drag
-    if (e.touches.length !== 1) return;
+    if (e.touches.length !== 1) return; // Only single touch
 
-    setDraggedItemIndex(index); // Use the same state for consistency
-    setTouchStartPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
-    setTouchCurrentPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    setTouchDraggingIndex(index);
+    setTouchStartCoords({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    setTouchCurrentCoords({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    setIsTouchDragging(false); // Initially not dragging, waiting for threshold
 
-    // Get the DOM node of the item being touched
-    const listItem = e.currentTarget;
-    touchDragItemRef.current = listItem;
-    listItem.style.position = 'relative'; // Allow transform
-    listItem.style.zIndex = '1000'; // Bring to front
-    listItem.classList.add('opacity-50'); // Visual feedback for dragging
-
-    // Add global touchmove/touchend listeners to capture events even if finger leaves the element
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    // Add event listeners to the document to capture moves outside the initial element
+    document.addEventListener('touchmove', handleTouchMove);
     document.addEventListener('touchend', handleTouchEnd);
-    document.addEventListener('touchcancel', handleTouchEnd); // Handle touch cancellation
+    document.addEventListener('touchcancel', handleTouchEnd);
   };
 
   const handleTouchMove = (e) => {
-    e.preventDefault(); // Prevent scrolling while dragging
-
-    if (draggedItemIndex === null || !touchDragItemRef.current || e.touches.length !== 1) return;
+    if (touchDraggingIndex === null || e.touches.length !== 1) return;
 
     const currentX = e.touches[0].clientX;
     const currentY = e.touches[0].clientY;
-    setTouchCurrentPos({ x: currentX, y: currentY });
 
-    // Update the position of the dragged item visually
-    const deltaX = currentX - touchStartPos.x;
-    const deltaY = currentY - touchStartPos.y;
-    touchDragItemRef.current.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+    const deltaX = currentX - touchStartCoords.x;
+    const deltaY = currentY - touchStartCoords.y;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-    // Determine the element under the current touch
-    const targetElement = document.elementFromPoint(currentX, currentY);
+    if (!isTouchDragging && distance > DRAG_THRESHOLD) {
+      // Threshold met, start dragging
+      setIsTouchDragging(true);
+      // Apply initial drag styles
+      const listItem = touchListItemRefs.current[touchDraggingIndex];
+      if (listItem) {
+        listItem.style.position = 'relative';
+        listItem.style.zIndex = '1000';
+        listItem.classList.add('opacity-50');
+      }
+    }
 
-    if (targetElement) {
-      // Find the closest parent <li> that is a selected sentence item
-      const closestLi = targetElement.closest('.customize-selected-sentence-item'); // Add a class to your li for easier targeting
-      if (closestLi && closestLi.parentNode === touchDragItemRef.current.parentNode) {
-        const targetIndex = getElementIndex(closestLi);
-        if (targetIndex !== -1 && targetIndex !== draggedItemIndex) {
-          setTouchTargetIndex(targetIndex);
-          setDragOverItemIndex(targetIndex); // Use existing visual state for hover
+    if (isTouchDragging) {
+      e.preventDefault(); // Prevent scrolling ONLY when actively dragging
+      setTouchCurrentCoords({ x: currentX, y: currentY });
+
+      const listItem = touchListItemRefs.current[touchDraggingIndex];
+      if (listItem) {
+        listItem.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+      }
+
+      // Determine the element under the current touch
+      const targetElement = document.elementFromPoint(currentX, currentY);
+
+      if (targetElement) {
+        const closestLi = targetElement.closest('.customize-selected-sentence-item');
+        if (closestLi && closestLi.parentNode === touchListItemRefs.current[touchDraggingIndex]?.parentNode) {
+          const targetIndex = selectedSentencesData.findIndex(item => item.id === closestLi.dataset.id);
+          if (targetIndex !== -1 && targetIndex !== touchDraggingIndex) {
+            setDragOverItemIndex(targetIndex);
+          } else {
+            setDragOverItemIndex(null);
+          }
         } else {
-          setTouchTargetIndex(null);
           setDragOverItemIndex(null);
         }
-      } else {
-        setTouchTargetIndex(null);
-        setDragOverItemIndex(null);
       }
     }
   };
 
   const handleTouchEnd = () => {
-    if (draggedItemIndex === null) return;
+    if (touchDraggingIndex === null) return;
 
-    // Remove temporary styles
-    if (touchDragItemRef.current) {
-      touchDragItemRef.current.style.transform = '';
-      touchDragItemRef.current.style.zIndex = '';
-      touchDragItemRef.current.classList.remove('opacity-50');
-      touchDragItemRef.current = null;
+    // Clean up styles
+    const listItem = touchListItemRefs.current[touchDraggingIndex];
+    if (listItem) {
+      listItem.style.transform = '';
+      listItem.style.zIndex = '';
+      listItem.classList.remove('opacity-50');
     }
 
-    // Perform the reordering if a valid target was found
-    if (touchTargetIndex !== null && draggedItemIndex !== touchTargetIndex) {
+    // Perform reordering if a drag was active and a valid target was found
+    if (isTouchDragging && dragOverItemIndex !== null && touchDraggingIndex !== dragOverItemIndex) {
       const newSelectedSentences = [...selectedSentencesData];
-      const [draggedItem] = newSelectedSentences.splice(draggedItemIndex, 1);
-      newSelectedSentences.splice(touchTargetIndex, 0, draggedItem);
+      const [draggedItem] = newSelectedSentences.splice(touchDraggingIndex, 1);
+      newSelectedSentences.splice(dragOverItemIndex, 0, draggedItem);
       setSelectedSentencesData(newSelectedSentences);
     }
 
-    // Reset all drag states
-    setDraggedItemIndex(null);
-    setDragOverItemIndex(null);
-    setTouchStartPos({ x: 0, y: 0 });
-    setTouchCurrentPos({ x: 0, y: 0 });
-    setTouchTargetIndex(null);
+    // Reset all touch drag states
+    setTouchDraggingIndex(null);
+    setTouchStartCoords({ x: 0, y: 0 });
+    setTouchCurrentCoords({ x: 0, y: 0 });
+    setIsTouchDragging(false);
+    setDragOverItemIndex(null); // Reset drag over visual
 
     // Remove global listeners
     document.removeEventListener('touchmove', handleTouchMove);
@@ -695,6 +692,7 @@ function App() {
                       return (
                         <li
                           key={selected.id} // Use unique ID for key
+                          data-id={selected.id} // Add data-id for easier lookup in touch events
                           draggable="true" // Keep for mouse drag
                           onDragStart={(e) => handleDragStart(e, index)}
                           onDragEnter={(e) => handleDragEnter(e, index)}
@@ -706,9 +704,10 @@ function App() {
                           onTouchStart={(e) => handleTouchStart(e, index)}
                           // onTouchMove and onTouchEnd are added to document for global tracking
                           className={`flex items-center bg-white p-3 rounded-md shadow-sm border border-gray-200 cursor-grab customize-selected-sentence-item
-                            ${draggedItemIndex === index ? 'opacity-50' : ''}
-                            ${dragOverItemIndex === index && draggedItemIndex !== index ? 'border-2 border-blue-500 bg-blue-50' : ''}
+                            ${(draggedItemIndex === index || touchDraggingIndex === index) ? 'opacity-50' : ''}
+                            ${dragOverItemIndex === index && (draggedItemIndex !== index && touchDraggingIndex !== index) ? 'border-2 border-blue-500 bg-blue-50' : ''}
                           `}
+                          ref={el => touchListItemRefs.current[index] = el} // Store ref for each item
                         >
                           <span className="text-gray-800 flex-grow">
                             {parts[0]}
@@ -753,7 +752,6 @@ function App() {
                 className="generated-script-preview w-full p-4 border border-gray-300 rounded-md bg-gray-50 text-gray-800 text-lg min-h-[80px] focus:ring-2 focus:ring-green-500 focus:border-transparent transition duration-200 ease-in-out"
                 contentEditable="true"
                 onInput={handleGeneratedScriptInput}
-                // Removed dangerouslySetInnerHTML from here
                 ref={contentEditableRef}
               ></div>
 
