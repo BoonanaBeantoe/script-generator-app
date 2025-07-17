@@ -1,0 +1,43 @@
+// AddSentenceView.js (or directly in App.js if it's small)
+
+import React, { useState } from 'react';
+
+const AddSentenceView = ({ onAddSentence, onGoBack }) => {
+  const [newSentenceText, setNewSentenceText] = useState('');
+
+  const handleAddClick = () => {
+    if (newSentenceText.trim()) {
+      // You'll need a way to identify the percentage blank.
+      // A common convention is to use a placeholder like [PERCENTAGE].
+      // For now, let's just assume it's part of the text.
+      onAddSentence(newSentenceText.trim());
+      setNewSentenceText(''); // Clear the input after adding
+    } else {
+      alert('Please enter a sentence.');
+    }
+  };
+
+  return (
+    <div className="add-sentence-container">
+      <h2>Add New Template Sentence</h2>
+      <p>Type your sentence below. Use `[PERCENTAGE]` where the number should go (e.g., "Student was focused `[PERCENTAGE]`% of the time").</p>
+      <textarea
+        className="sentence-input-textarea"
+        value={newSentenceText}
+        onChange={(e) => setNewSentenceText(e.target.value)}
+        placeholder="e.g., John independently worked for [PERCENTAGE]% of the session."
+        rows="5"
+      ></textarea>
+      <div className="add-sentence-buttons">
+        <button onClick={handleAddClick} className="add-button">
+          Add Sentence
+        </button>
+        <button onClick={onGoBack} className="back-button">
+          Back to Main
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default AddSentenceView;

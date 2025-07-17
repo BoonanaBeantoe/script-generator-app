@@ -1,0 +1,264 @@
+/* Basic Reset & Box Sizing */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Base Body Styles */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+    line-height: 1.6;
+    background-color: #f8f9fa;
+    color: #333;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* App Container */
+.app-container {
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 15px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    text-align: center;
+    color: #0056b3;
+    margin-bottom: 25px;
+    font-size: 1.8em;
+}
+
+/* Script Editor Area */
+.script-editor {
+    display: flex;
+    flex-wrap: wrap; /* Allows elements to wrap to the next line on small screens */
+    align-items: baseline; /* Aligns text and inputs nicely */
+    margin-bottom: 30px;
+    background-color: #e9ecef;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    font-size: 1em; /* Base font size for readability */
+}
+
+.script-text {
+    white-space: pre-wrap; /* Preserves white space and wraps text */
+    word-break: break-word; /* Breaks long words if necessary */
+    margin-right: 4px; /* Small spacing between segments */
+    margin-bottom: 8px; /* For wrapping elements */
+}
+
+/* Blank Input Styling */
+.blank-input-container {
+    position: relative;
+    display: inline-block; /* Allows text to flow around it */
+    margin-right: 4px;
+    margin-bottom: 8px;
+}
+
+.blank-input {
+    min-width: 100px; /* Ensures blanks are visible */
+    padding: 6px 10px;
+    border: 1px solid #007bff;
+    border-radius: 4px;
+    font-size: inherit; /* Inherits font size from parent */
+    color: #0056b3;
+    background-color: #f0f8ff;
+    transition: all 0.2s ease-in-out;
+}
+
+.blank-input:focus {
+    outline: none;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+    background-color: #ffffff;
+}
+
+/* Suggestions List */
+.suggestions-list {
+    position: absolute;
+    top: 100%; /* Position below the input */
+    left: 0;
+    right: 0;
+    z-index: 10;
+    list-style: none;
+    background-color: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    max-height: 150px;
+    overflow-y: auto;
+    margin-top: 2px;
+}
+
+.suggestions-list li {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.9em;
+    color: #495057;
+}
+
+.suggestions-list li:hover,
+.suggestions-list li:focus {
+    background-color: #e2e6ea;
+    color: #212529;
+}
+
+/* Choice Input Styling */
+.choice-input-container {
+    display: inline-flex; /* Use flex to align label, select, and button */
+    align-items: center;
+    margin-right: 4px;
+    margin-bottom: 8px;
+    background-color: #d1ecf1;
+    border: 1px solid #00a1b9;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+.choice-label {
+    font-weight: bold;
+    color: #0056b3;
+    margin-right: 5px;
+    white-space: nowrap; /* Prevent label from breaking */
+}
+
+.choice-select {
+    padding: 5px 8px;
+    border: 1px solid #007bff;
+    border-radius: 4px;
+    background-color: #f0f8ff;
+    font-size: inherit;
+    color: #0056b3;
+    appearance: none; /* Remove default select arrow */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.7em top 50%;
+    background-size: 0.65em auto;
+}
+
+.choice-select:focus {
+    outline: none;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+}
+
+.remove-choice-btn {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2em;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: background-color 0.2s ease;
+}
+
+.remove-choice-btn:hover {
+    background-color: #c82333;
+}
+
+/* Output Section */
+.output-section {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.output-section h2 {
+    font-size: 1.5em;
+    color: #0056b3;
+    margin-bottom: 15px;
+}
+
+.generated-script-preview {
+    background-color: #e9ecef;
+    border: 1px dashed #ced4da;
+    padding: 15px;
+    border-radius: 6px;
+    min-height: 80px;
+    font-size: 1.1em;
+    color: #495057;
+    white-space: pre-wrap; /* Preserve white space and allow wrapping */
+    word-break: break-word;
+    margin-bottom: 20px;
+}
+
+.copy-button {
+    display: block; /* Make it a block element to take full width */
+    width: 100%;
+    padding: 12px 20px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 1.1em;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.copy-button:hover {
+    background-color: #218838;
+}
+
+.note {
+    text-align: center;
+    font-size: 0.85em;
+    color: #6c757d;
+    margin-top: 20px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 600px) {
+    .app-container {
+        margin: 10px auto;
+        padding: 10px;
+    }
+
+    h1 {
+        font-size: 1.5em;
+    }
+
+    .script-editor, .output-section {
+        padding: 10px;
+    }
+
+    .script-text, .blank-input-container, .choice-input-container {
+        margin-right: 0; /* Remove horizontal margin for full width wrap */
+        width: 100%; /* Take full width on small screens */
+        display: block; /* Stack elements vertically */
+    }
+
+    .blank-input, .choice-select {
+        width: 100%; /* Full width inputs on mobile */
+    }
+
+    .choice-input-container {
+        flex-direction: column; /* Stack label, select, button vertically */
+        align-items: flex-start; /* Align elements to the left */
+        padding: 8px;
+    }
+
+    .choice-label {
+        margin-bottom: 5px; /* Space between label and select */
+    }
+
+    .remove-choice-btn {
+        margin-left: 0; /* Align with other elements */
+        margin-top: 8px; /* Space above button */
+    }
+
+    .copy-button {
+        padding: 10px 15px;
+        font-size: 1em;
+    }
+}
