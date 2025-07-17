@@ -162,7 +162,7 @@ const ManageSentencesView = ({ sentenceBank, onAddSentence, onDeleteSentence, on
       <div className="w-full mb-8 p-4 border border-gray-200 rounded-lg bg-gray-50">
         <h3 className="text-xl font-semibold mb-3 text-gray-800">Add New Sentence</h3>
         <p className="text-gray-600 mb-4 text-center">
-          Type your sentence below. You can use <code className="bg-gray-100 p-1 rounded font-mono text-sm">[PERCENTAGE]</code> where a number should go (e.g., "Student was focused <code className="bg-gray-100 p-1 rounded font-mono text-sm">[PERCENTAGE]</code>% of the time"). If not used, the sentence will be static.
+          Type your sentence below. You can use <code className="bg-gray-100 p-1 rounded font-mono text-sm">[PERCENTAGE]</code> where a number should go (e.g., "Student was focused <code className="bg-100 p-1 rounded font-mono text-sm">[PERCENTAGE]</code>% of the time"). If not used, the sentence will be static.
         </p>
         <textarea
           className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out resize-y min-h-[120px] text-gray-800"
@@ -277,11 +277,15 @@ function App() {
   const [dragOverItemIndex, setDragOverItemIndex] = useState(null);
 
   // Effect to update generatedScriptOutput whenever selectedSentencesData or sentenceBank changes
+  // This effect now ONLY updates the contentEditable div's innerText if it's not focused.
+  // It also updates the generatedScriptOutput state for character count/copy.
   useEffect(() => {
-    if (document.activeElement !== contentEditableRef.current) {
-      setGeneratedScriptOutput(generateFinalScript());
+    const newScript = generateFinalScript();
+    if (contentEditableRef.current && document.activeElement !== contentEditableRef.current) {
+      contentEditableRef.current.innerText = newScript;
     }
-  }, [selectedSentencesData, sentenceBank, sessionContext]); // Add sessionContext to dependencies
+    setGeneratedScriptOutput(newScript); // Keep state updated for copy/char count
+  }, [selectedSentencesData, sentenceBank, sessionContext]);
 
   // Effect to update character count whenever generatedScriptOutput changes
   useEffect(() => {
@@ -299,6 +303,8 @@ function App() {
 
 
   // Effect to restore caret position after re-render
+  // This effect is still needed for when the contentEditable div *is* focused and its content is changed
+  // (e.g., by typing), to ensure the cursor stays in place.
   useEffect(() => {
     if (contentEditableRef.current && document.activeElement === contentEditableRef.current) {
       try {
@@ -309,6 +315,7 @@ function App() {
           const safeCaretPosition = Math.min(caretPosition, textNodeLength);
           range.setStart(contentEditableRef.current.firstChild, safeCaretPosition);
         } else {
+          // If no text node, or empty, set cursor at beginning of the div
           range.setStart(contentEditableRef.current, 0);
         }
         range.collapse(true);
@@ -316,10 +323,11 @@ function App() {
         sel.addRange(range);
       } catch (error) {
         console.warn("Could not restore caret position:", error);
-        contentEditableRef.current.focus();
+        contentEditableRef.current.focus(); // Fallback to just focusing
       }
     }
-  }, [generatedScriptOutput, caretPosition]);
+  }, [caretPosition]); // Only depend on caretPosition, as generatedScriptOutput changes would cause re-render issues
+
 
   // Function to add a new sentence to the sentenceBank
   const handleAddSentence = (newSentence) => {
@@ -370,17 +378,20 @@ function App() {
 
   // Handles copying the generated script to the clipboard
   const handleCopy = () => {
-    if (generatedScriptOutput.includes('[PERCENTAGE]')) {
+    // Use the current content of the contentEditable div for copying
+    const currentScriptContent = contentEditableRef.current ? contentEditableRef.current.innerText : generatedScriptOutput;
+
+    if (currentScriptContent.includes('[PERCENTAGE]')) {
       setShowPercentageWarningModal(true);
     } else {
-      performCopy();
+      performCopy(currentScriptContent);
     }
   };
 
   // Actual copy logic, separated for conditional execution
-  const performCopy = () => {
+  const performCopy = (textToCopy) => {
     const tempTextArea = document.createElement('textarea');
-    tempTextArea.value = generatedScriptOutput;
+    tempTextArea.value = textToCopy;
     document.body.appendChild(tempTextArea);
     tempTextArea.select();
     try {
@@ -407,6 +418,7 @@ function App() {
     } else {
       setCaretPosition(0);
     }
+    // Update the state based on the current contentEditable value
     setGeneratedScriptOutput(e.target.innerText);
   };
 
@@ -633,7 +645,7 @@ function App() {
                 className="generated-script-preview w-full p-4 border border-gray-300 rounded-md bg-gray-50 text-gray-800 text-lg min-h-[80px] focus:ring-2 focus:ring-green-500 focus:border-transparent transition duration-200 ease-in-out"
                 contentEditable="true"
                 onInput={handleGeneratedScriptInput}
-                dangerouslySetInnerHTML={{ __html: generatedScriptOutput }}
+                // Removed dangerouslySetInnerHTML from here
                 ref={contentEditableRef}
               ></div>
 
