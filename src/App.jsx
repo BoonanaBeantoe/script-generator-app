@@ -276,6 +276,13 @@ function App() {
   const [draggedItemIndex, setDraggedItemIndex] = useState(null);
   const [dragOverItemIndex, setDragOverItemIndex] = useState(null);
 
+  // Touch-specific drag states
+  const [touchDraggedItem, setTouchDraggedItem] = useState(null); // The actual DOM element being dragged
+  const [touchStartPos, setTouchStartPos] = useState({ x: 0, y: 0 });
+  const [touchCurrentPos, setTouchCurrentPos] = useState({ x: 0, y: 0 });
+  const [touchTargetIndex, setTouchTargetIndex] = useState(null);
+
+
   // Effect to update generatedScriptOutput whenever selectedSentencesData or sentenceBank changes
   // This effect now ONLY updates the contentEditable div's innerText if it's not focused.
   // It also updates the generatedScriptOutput state for character count/copy.
@@ -445,7 +452,7 @@ function App() {
     );
   };
 
-  // --- Drag and Drop Handlers ---
+  // --- Drag and Drop Handlers (Mouse) ---
   const handleDragStart = (e, index) => {
     setDraggedItemIndex(index);
     e.dataTransfer.effectAllowed = 'move';
@@ -463,7 +470,6 @@ function App() {
 
   const handleDragLeave = (e) => {
     // Clear highlight when leaving, but only if not leaving to a child element
-    // This is a common issue with dragleave, often better handled by dragend or drop
     // For simplicity, we'll let dragOverItemIndex be updated by dragEnter
   };
 
@@ -491,7 +497,106 @@ function App() {
     setDraggedItemIndex(null);
     setDragOverItemIndex(null);
   };
-  // --- End Drag and Drop Handlers ---
+  // --- End Drag and Drop Handlers (Mouse) ---
+
+  // --- Touch Drag and Drop Handlers ---
+  const touchDragItemRef = useRef(null); // Ref for the currently touched/dragged item's DOM node
+
+  const getElementIndex = (element) => {
+    if (!element || !element.parentNode) return -1;
+    return Array.from(element.parentNode.children).indexOf(element);
+  };
+
+  const handleTouchStart = (e, index) => {
+    // Only allow single touch drag
+    if (e.touches.length !== 1) return;
+
+    setDraggedItemIndex(index); // Use the same state for consistency
+    setTouchStartPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    setTouchCurrentPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+
+    // Get the DOM node of the item being touched
+    const listItem = e.currentTarget;
+    touchDragItemRef.current = listItem;
+    listItem.style.position = 'relative'; // Allow transform
+    listItem.style.zIndex = '1000'; // Bring to front
+    listItem.classList.add('opacity-50'); // Visual feedback for dragging
+
+    // Add global touchmove/touchend listeners to capture events even if finger leaves the element
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchcancel', handleTouchEnd); // Handle touch cancellation
+  };
+
+  const handleTouchMove = (e) => {
+    e.preventDefault(); // Prevent scrolling while dragging
+
+    if (draggedItemIndex === null || !touchDragItemRef.current || e.touches.length !== 1) return;
+
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    setTouchCurrentPos({ x: currentX, y: currentY });
+
+    // Update the position of the dragged item visually
+    const deltaX = currentX - touchStartPos.x;
+    const deltaY = currentY - touchStartPos.y;
+    touchDragItemRef.current.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+
+    // Determine the element under the current touch
+    const targetElement = document.elementFromPoint(currentX, currentY);
+
+    if (targetElement) {
+      // Find the closest parent <li> that is a selected sentence item
+      const closestLi = targetElement.closest('.customize-selected-sentence-item'); // Add a class to your li for easier targeting
+      if (closestLi && closestLi.parentNode === touchDragItemRef.current.parentNode) {
+        const targetIndex = getElementIndex(closestLi);
+        if (targetIndex !== -1 && targetIndex !== draggedItemIndex) {
+          setTouchTargetIndex(targetIndex);
+          setDragOverItemIndex(targetIndex); // Use existing visual state for hover
+        } else {
+          setTouchTargetIndex(null);
+          setDragOverItemIndex(null);
+        }
+      } else {
+        setTouchTargetIndex(null);
+        setDragOverItemIndex(null);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (draggedItemIndex === null) return;
+
+    // Remove temporary styles
+    if (touchDragItemRef.current) {
+      touchDragItemRef.current.style.transform = '';
+      touchDragItemRef.current.style.zIndex = '';
+      touchDragItemRef.current.classList.remove('opacity-50');
+      touchDragItemRef.current = null;
+    }
+
+    // Perform the reordering if a valid target was found
+    if (touchTargetIndex !== null && draggedItemIndex !== touchTargetIndex) {
+      const newSelectedSentences = [...selectedSentencesData];
+      const [draggedItem] = newSelectedSentences.splice(draggedItemIndex, 1);
+      newSelectedSentences.splice(touchTargetIndex, 0, draggedItem);
+      setSelectedSentencesData(newSelectedSentences);
+    }
+
+    // Reset all drag states
+    setDraggedItemIndex(null);
+    setDragOverItemIndex(null);
+    setTouchStartPos({ x: 0, y: 0 });
+    setTouchCurrentPos({ x: 0, y: 0 });
+    setTouchTargetIndex(null);
+
+    // Remove global listeners
+    document.removeEventListener('touchmove', handleTouchMove);
+    document.removeEventListener('touchend', handleTouchEnd);
+    document.removeEventListener('touchcancel', handleTouchEnd);
+  };
+  // --- End Touch Drag and Drop Handlers ---
+
 
   // Filter sentences based on search term
   const filteredSentences = sentenceBank.filter(sentence =>
@@ -590,14 +695,17 @@ function App() {
                       return (
                         <li
                           key={selected.id} // Use unique ID for key
-                          draggable="true"
+                          draggable="true" // Keep for mouse drag
                           onDragStart={(e) => handleDragStart(e, index)}
                           onDragEnter={(e) => handleDragEnter(e, index)}
                           onDragLeave={(e) => setDragOverItemIndex(null)} // Clear on leave
                           onDragOver={handleDragOver} // Crucial for drop to work
                           onDrop={(e) => handleDrop(e, index)}
                           onDragEnd={handleDragEnd}
-                          className={`flex items-center bg-white p-3 rounded-md shadow-sm border border-gray-200 cursor-grab
+                          // Touch events for mobile drag and drop
+                          onTouchStart={(e) => handleTouchStart(e, index)}
+                          // onTouchMove and onTouchEnd are added to document for global tracking
+                          className={`flex items-center bg-white p-3 rounded-md shadow-sm border border-gray-200 cursor-grab customize-selected-sentence-item
                             ${draggedItemIndex === index ? 'opacity-50' : ''}
                             ${dragOverItemIndex === index && draggedItemIndex !== index ? 'border-2 border-blue-500 bg-blue-50' : ''}
                           `}
