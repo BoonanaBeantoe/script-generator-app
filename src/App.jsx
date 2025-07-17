@@ -513,7 +513,8 @@ function App() {
     setIsTouchDragging(false); // Initially not dragging, waiting for threshold
 
     // Add event listeners to the document to capture moves outside the initial element
-    document.addEventListener('touchmove', handleTouchMove);
+    // Use { passive: false } to allow preventDefault
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
     document.addEventListener('touchcancel', handleTouchEnd);
   };
@@ -534,8 +535,13 @@ function App() {
       // Apply initial drag styles
       const listItem = touchListItemRefs.current[touchDraggingIndex];
       if (listItem) {
-        listItem.style.position = 'absolute'; // Use absolute for visual drag
-        listItem.style.width = listItem.offsetWidth + 'px'; // Maintain original width
+        // Get initial bounding rect for positioning
+        const rect = listItem.getBoundingClientRect();
+        listItem.style.position = 'fixed'; // Use fixed to drag relative to viewport
+        listItem.style.width = `${rect.width}px`; // Maintain original width
+        listItem.style.height = `${rect.height}px`; // Maintain original height
+        listItem.style.left = `${rect.left}px`;
+        listItem.style.top = `${rect.top}px`;
         listItem.style.zIndex = '1000'; // Bring to front
         listItem.classList.add('opacity-50'); // Visual feedback for dragging
       }
@@ -547,9 +553,10 @@ function App() {
 
       const listItem = touchListItemRefs.current[touchDraggingIndex];
       if (listItem) {
-        // Update position based on initial touch start and current movement
-        listItem.style.left = `${deltaX}px`;
-        listItem.style.top = `${deltaY}px`;
+        // Update position relative to initial touch start
+        const initialRect = listItem.getBoundingClientRect(); // Get current position
+        listItem.style.left = `${initialRect.left + deltaX}px`;
+        listItem.style.top = `${initialRect.top + deltaY}px`;
       }
 
       // Determine the element under the current touch
@@ -582,6 +589,7 @@ function App() {
     if (listItem) {
       listItem.style.position = ''; // Reset position
       listItem.style.width = ''; // Reset width
+      listItem.style.height = ''; // Reset height
       listItem.style.left = ''; // Reset left
       listItem.style.top = ''; // Reset top
       listItem.style.zIndex = '';
@@ -716,11 +724,13 @@ function App() {
                           onDragOver={handleDragOver} // Crucial for drop to work
                           onDrop={(e) => handleDrop(e, index)}
                           onDragEnd={handleDragEnd}
-                          className={`flex items-center bg-white p-3 rounded-md shadow-sm border border-gray-200 cursor-grab customize-selected-sentence-item
+                          // Removed onTouchStart from the li itself
+                          className={`flex items-center bg-white p-3 rounded-md shadow-sm border border-gray-200 customize-selected-sentence-item
                             ${(draggedItemIndex === index || touchDraggingIndex === index) ? 'opacity-50' : ''}
                             ${dragOverItemIndex === index && (draggedItemIndex !== index && touchDraggingIndex !== index) ? 'border-2 border-blue-500 bg-blue-50' : ''}
                           `}
                           ref={el => touchListItemRefs.current[index] = el} // Store ref for each item
+                          style={{ touchAction: 'none' }} // Prevent default touch actions on the list item itself
                         >
                           <span className="text-gray-800 flex-grow">
                             {parts[0]}
@@ -741,7 +751,7 @@ function App() {
                           <div
                             className="ml-2 px-2 py-1 bg-gray-200 rounded-md cursor-grab text-gray-600 flex flex-col items-center justify-center"
                             onTouchStart={(e) => handleGrabHandleTouchStart(e, index)}
-                            style={{ touchAction: 'none' }} // Prevent default browser touch actions
+                            style={{ touchAction: 'none' }} // Prevent default browser touch actions on the handle
                           >
                             <span className="text-xs leading-none">•••</span>
                             <span className="text-xs leading-none">•••</span>
@@ -826,3 +836,4 @@ function App() {
 }
 
 export default App;
+
