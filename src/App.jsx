@@ -1,6 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 // The CSS is in a separate immersive block named 'script-app-css'.
-import './script-app-css.css'; // Add this line
 
 // --- Initial Data Model for Sentence Bank ---
 const initialSentenceBank = [
@@ -242,8 +242,20 @@ const ManageSentencesView = ({ sentenceBank, onAddSentence, onDeleteSentence, on
 
 // --- Main App Component ---
 function App() {
+  // Function to get initial sentence bank from local storage or use default
+  const getInitialSentenceBank = () => {
+    try {
+      const storedSentences = localStorage.getItem('sentenceBank');
+      return storedSentences ? JSON.parse(storedSentences) : initialSentenceBank;
+    } catch (error) {
+      console.error("Error loading sentences from local storage:", error);
+      return initialSentenceBank; // Fallback to default if local storage fails
+    }
+  };
+
   const [currentView, setCurrentView] = useState('main');
-  const [sentenceBank, setSentenceBank] = useState(initialSentenceBank);
+  // Initialize sentenceBank from local storage
+  const [sentenceBank, setSentenceBank] = useState(getInitialSentenceBank());
   const [selectedSentencesData, setSelectedSentencesData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -274,6 +286,15 @@ function App() {
   useEffect(() => {
     setCharacterCount(generatedScriptOutput.length);
   }, [generatedScriptOutput]);
+
+  // Effect to save sentenceBank to local storage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('sentenceBank', JSON.stringify(sentenceBank));
+    } catch (error) {
+      console.error("Error saving sentences to local storage:", error);
+    }
+  }, [sentenceBank]); // Dependency array ensures this runs when sentenceBank changes
 
 
   // Effect to restore caret position after re-render
@@ -664,4 +685,3 @@ function App() {
 }
 
 export default App;
-
