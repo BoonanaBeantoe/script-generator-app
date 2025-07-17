@@ -497,12 +497,6 @@ function App() {
   // --- End Drag and Drop Handlers (Mouse) ---
 
   // --- Touch Drag and Drop Handlers ---
-
-  // Effect to manage touchListItemRefs: clear and re-populate on data change
-  useEffect(() => {
-    touchListItemRefs.current = touchListItemRefs.current.slice(0, selectedSentencesData.length);
-  }, [selectedSentencesData]);
-
   const handleTouchStart = (e, index) => {
     if (e.touches.length !== 1) return; // Only single touch
 
@@ -512,7 +506,7 @@ function App() {
     setIsTouchDragging(false); // Initially not dragging, waiting for threshold
 
     // Add event listeners to the document to capture moves outside the initial element
-    document.addEventListener('touchmove', handleTouchMove, { passive: false }); // passive: false to allow preventDefault
+    document.addEventListener('touchmove', handleTouchMove);
     document.addEventListener('touchend', handleTouchEnd);
     document.addEventListener('touchcancel', handleTouchEnd);
   };
@@ -533,10 +527,9 @@ function App() {
       // Apply initial drag styles
       const listItem = touchListItemRefs.current[touchDraggingIndex];
       if (listItem) {
-        listItem.style.position = 'absolute'; // Use absolute for visual drag
-        listItem.style.width = listItem.offsetWidth + 'px'; // Maintain original width
-        listItem.style.zIndex = '1000'; // Bring to front
-        listItem.classList.add('opacity-50'); // Visual feedback for dragging
+        listItem.style.position = 'relative';
+        listItem.style.zIndex = '1000';
+        listItem.classList.add('opacity-50');
       }
     }
 
@@ -546,9 +539,7 @@ function App() {
 
       const listItem = touchListItemRefs.current[touchDraggingIndex];
       if (listItem) {
-        // Update position based on initial touch start and current movement
-        listItem.style.left = `${deltaX}px`;
-        listItem.style.top = `${deltaY}px`;
+        listItem.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
       }
 
       // Determine the element under the current touch
@@ -557,10 +548,7 @@ function App() {
       if (targetElement) {
         const closestLi = targetElement.closest('.customize-selected-sentence-item');
         if (closestLi && closestLi.parentNode === touchListItemRefs.current[touchDraggingIndex]?.parentNode) {
-          // Find the index of the closestLi within the current visible list items
-          const allListItems = Array.from(closestLi.parentNode.children);
-          const targetIndex = allListItems.indexOf(closestLi);
-
+          const targetIndex = selectedSentencesData.findIndex(item => item.id === closestLi.dataset.id);
           if (targetIndex !== -1 && targetIndex !== touchDraggingIndex) {
             setDragOverItemIndex(targetIndex);
           } else {
@@ -579,10 +567,7 @@ function App() {
     // Clean up styles
     const listItem = touchListItemRefs.current[touchDraggingIndex];
     if (listItem) {
-      listItem.style.position = ''; // Reset position
-      listItem.style.width = ''; // Reset width
-      listItem.style.left = ''; // Reset left
-      listItem.style.top = ''; // Reset top
+      listItem.style.transform = '';
       listItem.style.zIndex = '';
       listItem.classList.remove('opacity-50');
     }
@@ -819,4 +804,3 @@ function App() {
 }
 
 export default App;
-
