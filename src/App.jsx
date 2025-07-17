@@ -496,15 +496,16 @@ function App() {
   };
   // --- End Drag and Drop Handlers (Mouse) ---
 
-  // --- Touch Drag and Drop Handlers ---
+  // --- Touch Drag and Drop Handlers (using a grab handle) ---
 
   // Effect to manage touchListItemRefs: clear and re-populate on data change
   useEffect(() => {
     touchListItemRefs.current = touchListItemRefs.current.slice(0, selectedSentencesData.length);
   }, [selectedSentencesData]);
 
-  const handleTouchStart = (e, index) => {
-    if (e.touches.length !== 1) return; // Only single touch
+  const handleGrabHandleTouchStart = (e, index) => {
+    e.stopPropagation(); // Prevent the li's onClick from firing
+    if (e.touches.length !== 1) return;
 
     setTouchDraggingIndex(index);
     setTouchStartCoords({ x: e.touches[0].clientX, y: e.touches[0].clientY });
@@ -512,7 +513,7 @@ function App() {
     setIsTouchDragging(false); // Initially not dragging, waiting for threshold
 
     // Add event listeners to the document to capture moves outside the initial element
-    document.addEventListener('touchmove', handleTouchMove, { passive: false }); // passive: false to allow preventDefault
+    document.addEventListener('touchmove', handleTouchMove);
     document.addEventListener('touchend', handleTouchEnd);
     document.addEventListener('touchcancel', handleTouchEnd);
   };
@@ -715,9 +716,6 @@ function App() {
                           onDragOver={handleDragOver} // Crucial for drop to work
                           onDrop={(e) => handleDrop(e, index)}
                           onDragEnd={handleDragEnd}
-                          // Touch events for mobile drag and drop
-                          onTouchStart={(e) => handleTouchStart(e, index)}
-                          // onTouchMove and onTouchEnd are added to document for global tracking
                           className={`flex items-center bg-white p-3 rounded-md shadow-sm border border-gray-200 cursor-grab customize-selected-sentence-item
                             ${(draggedItemIndex === index || touchDraggingIndex === index) ? 'opacity-50' : ''}
                             ${dragOverItemIndex === index && (draggedItemIndex !== index && touchDraggingIndex !== index) ? 'border-2 border-blue-500 bg-blue-50' : ''}
@@ -739,9 +737,18 @@ function App() {
                             )}
                             {parts[1]}
                           </span>
+                          {/* Grab Handle for Touch Drag */}
+                          <div
+                            className="ml-2 px-2 py-1 bg-gray-200 rounded-md cursor-grab text-gray-600 flex flex-col items-center justify-center"
+                            onTouchStart={(e) => handleGrabHandleTouchStart(e, index)}
+                            style={{ touchAction: 'none' }} // Prevent default browser touch actions
+                          >
+                            <span className="text-xs leading-none">•••</span>
+                            <span className="text-xs leading-none">•••</span>
+                          </div>
                           <button
                             onClick={() => toggleSentenceSelection(selected.id)}
-                            className="ml-4 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-bold hover:bg-red-600 transition duration-200 ease-in-out"
+                            className="ml-2 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-bold hover:bg-red-600 transition duration-200 ease-in-out"
                           >
                             &times;
                           </button>
@@ -819,4 +826,3 @@ function App() {
 }
 
 export default App;
-
