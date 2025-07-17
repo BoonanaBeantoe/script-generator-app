@@ -271,18 +271,13 @@ function App() {
   // New state for session context
   const [sessionContext, setSessionContext] = useState(sessionContextOptions.oneToOne); // Default to one-to-one
 
-  // States for drag and drop (mouse)
+  // State to manage the sentence being moved in two-step process
+  const [sentenceToMoveId, setSentenceToMoveId] = useState(null);
+
+  // States for mouse drag and drop (re-added)
   const [draggedItemIndex, setDraggedItemIndex] = useState(null);
   const [dragOverItemIndex, setDragOverItemIndex] = useState(null);
 
-  // Touch-specific drag states
-  const [touchDraggingIndex, setTouchDraggingIndex] = useState(null); // The index of the item being touched/dragged
-  const [touchStartCoords, setTouchStartCoords] = useState({ x: 0, y: 0 }); // Initial touch coordinates
-  const [touchCurrentCoords, setTouchCurrentCoords] = useState({ x: 0, y: 0 }); // Current touch coordinates
-  const [isTouchDragging, setIsTouchDragging] = useState(false); // Flag to indicate active touch drag
-  const touchListItemRefs = useRef([]); // Refs for all list items to get their positions
-
-  const DRAG_THRESHOLD = 10; // Pixels to move before a drag is initiated
 
   // Effect to update generatedScriptOutput whenever selectedSentencesData or sentenceBank changes
   useEffect(() => {
@@ -426,12 +421,12 @@ function App() {
     setGeneratedScriptOutput(e.target.innerText);
   };
 
-  // Toggle selection of a sentence
+  // Toggle selection of a sentence (used for adding from bank, and deleting via X button)
   const toggleSentenceSelection = (sentenceId) => {
     setSelectedSentencesData(prevData => {
       const isSelected = prevData.some(s => s.id === sentenceId);
       if (isSelected) {
-        // Remove sentence
+        // Remove sentence (only when triggered by X button)
         return prevData.filter(s => s.id !== sentenceId);
       } else {
         // Add sentence to the end of the selected list
@@ -449,36 +444,30 @@ function App() {
     );
   };
 
-  // --- Drag and Drop Handlers (Mouse) ---
+  // --- Mouse Drag and Drop Handlers (re-added) ---
   const handleDragStart = (e, index) => {
     setDraggedItemIndex(index);
     e.dataTransfer.effectAllowed = 'move';
-    // Set a transparent image for the drag feedback to prevent default ghost image
     const img = new Image();
     img.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
     e.dataTransfer.setDragImage(img, 0, 0);
   };
 
   const handleDragEnter = (e, index) => {
-    e.preventDefault(); // Necessary to allow drop
-    if (draggedItemIndex === index) return; // Don't highlight if dragging over itself
+    e.preventDefault();
+    if (draggedItemIndex === index) return;
     setDragOverItemIndex(index);
   };
 
-  const handleDragLeave = (e) => {
-    // Clear highlight when leaving, but only if not leaving to a child element
-    // For simplicity, we'll let dragOverItemIndex be updated by dragEnter
-  };
-
   const handleDragOver = (e) => {
-    e.preventDefault(); // Crucial: Allows a drop to happen
+    e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDrop = (e, dropIndex) => {
     e.preventDefault();
     if (draggedItemIndex === null || draggedItemIndex === dropIndex) {
-      return; // No item being dragged or dropping on itself
+      return;
     }
 
     const newSelectedSentences = [...selectedSentencesData];
@@ -494,129 +483,68 @@ function App() {
     setDraggedItemIndex(null);
     setDragOverItemIndex(null);
   };
-  // --- End Drag and Drop Handlers (Mouse) ---
+  // --- End Mouse Drag and Drop Handlers ---
 
-  // --- Touch Drag and Drop Handlers (using a grab handle) ---
 
-  // Effect to manage touchListItemRefs: clear and re-populate on data change
-  useEffect(() => {
-    touchListItemRefs.current = touchListItemRefs.current.slice(0, selectedSentencesData.length);
-  }, [selectedSentencesData]);
-
-  const handleGrabHandleTouchStart = (e, index) => {
-    e.stopPropagation(); // Prevent the li's onClick from firing
-    if (e.touches.length !== 1) return;
-
-    setTouchDraggingIndex(index);
-    setTouchStartCoords({ x: e.touches[0].clientX, y: e.touches[0].clientY });
-    setTouchCurrentCoords({ x: e.touches[0].clientX, y: e.touches[0].clientY });
-    setIsTouchDragging(false); // Initially not dragging, waiting for threshold
-
-    // Add event listeners to the document to capture moves outside the initial element
-    // Use { passive: false } to allow preventDefault
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd);
-    document.addEventListener('touchcancel', handleTouchEnd);
-  };
-
-  const handleTouchMove = (e) => {
-    if (touchDraggingIndex === null || e.touches.length !== 1) return;
-
-    const currentX = e.touches[0].clientX;
-    const currentY = e.touches[0].clientY;
-
-    const deltaX = currentX - touchStartCoords.x;
-    const deltaY = currentY - touchStartCoords.y;
-    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
-    if (!isTouchDragging && distance > DRAG_THRESHOLD) {
-      // Threshold met, start dragging
-      setIsTouchDragging(true);
-      // Apply initial drag styles
-      const listItem = touchListItemRefs.current[touchDraggingIndex];
-      if (listItem) {
-        // Get initial bounding rect for positioning
-        const rect = listItem.getBoundingClientRect();
-        listItem.style.position = 'fixed'; // Use fixed to drag relative to viewport
-        listItem.style.width = `${rect.width}px`; // Maintain original width
-        listItem.style.height = `${rect.height}px`; // Maintain original height
-        listItem.style.left = `${rect.left}px`;
-        listItem.style.top = `${rect.top}px`;
-        listItem.style.zIndex = '1000'; // Bring to front
-        listItem.classList.add('opacity-50'); // Visual feedback for dragging
-      }
-    }
-
-    if (isTouchDragging) {
-      e.preventDefault(); // Prevent scrolling ONLY when actively dragging
-      setTouchCurrentCoords({ x: currentX, y: currentY });
-
-      const listItem = touchListItemRefs.current[touchDraggingIndex];
-      if (listItem) {
-        // Update position relative to initial touch start
-        const initialRect = listItem.getBoundingClientRect(); // Get current position
-        listItem.style.left = `${initialRect.left + deltaX}px`;
-        listItem.style.top = `${initialRect.top + deltaY}px`;
-      }
-
-      // Determine the element under the current touch
-      const targetElement = document.elementFromPoint(currentX, currentY);
-
-      if (targetElement) {
-        const closestLi = targetElement.closest('.customize-selected-sentence-item');
-        if (closestLi && closestLi.parentNode === touchListItemRefs.current[touchDraggingIndex]?.parentNode) {
-          // Find the index of the closestLi within the current visible list items
-          const allListItems = Array.from(closestLi.parentNode.children);
-          const targetIndex = allListItems.indexOf(closestLi);
-
-          if (targetIndex !== -1 && targetIndex !== touchDraggingIndex) {
-            setDragOverItemIndex(targetIndex);
-          } else {
-            setDragOverItemIndex(null);
-          }
-        } else {
-          setDragOverItemIndex(null);
-        }
-      }
+  // --- Two-Step Move Logic ---
+  const handleMoveClick = (idToMove) => {
+    if (sentenceToMoveId === idToMove) {
+      // If clicking the same sentence again, cancel move mode
+      setSentenceToMoveId(null);
+    } else {
+      setSentenceToMoveId(idToMove);
     }
   };
 
-  const handleTouchEnd = () => {
-    if (touchDraggingIndex === null) return;
+  const handleDropSentence = (targetId = null, targetIndex = -1) => {
+    if (!sentenceToMoveId) return; // Not in move mode
 
-    // Clean up styles
-    const listItem = touchListItemRefs.current[touchDraggingIndex];
-    if (listItem) {
-      listItem.style.position = ''; // Reset position
-      listItem.style.width = ''; // Reset width
-      listItem.style.height = ''; // Reset height
-      listItem.style.left = ''; // Reset left
-      listItem.style.top = ''; // Reset top
-      listItem.style.zIndex = '';
-      listItem.classList.remove('opacity-50');
+    const newSelectedSentences = [...selectedSentencesData];
+    const sourceIndex = newSelectedSentences.findIndex(s => s.id === sentenceToMoveId);
+
+    if (sourceIndex === -1) {
+      setSentenceToMoveId(null); // Invalid sentence to move
+      return;
     }
 
-    // Perform reordering if a drag was active and a valid target was found
-    if (isTouchDragging && dragOverItemIndex !== null && touchDraggingIndex !== dragOverItemIndex) {
-      const newSelectedSentences = [...selectedSentencesData];
-      const [draggedItem] = newSelectedSentences.splice(touchDraggingIndex, 1);
-      newSelectedSentences.splice(dragOverItemIndex, 0, draggedItem);
-      setSelectedSentencesData(newSelectedSentences);
+    const [movedSentence] = newSelectedSentences.splice(sourceIndex, 1);
+
+    let finalTargetIndex;
+    if (targetIndex !== -1) {
+      // If a specific index was provided (e.g., from an an empty bubble)
+      finalTargetIndex = targetIndex;
+    } else if (targetId !== null) {
+      // If a targetId was provided (tapping an existing sentence)
+      finalTargetIndex = newSelectedSentences.findIndex(s => s.id === targetId);
+      if (finalTargetIndex === -1) { // If targetId is not found (e.g. empty list or removed item)
+        finalTargetIndex = newSelectedSentences.length; // Place at end
+      }
+    } else {
+      // If no target, simply cancel the move (e.g., clicking outside a target)
+      setSentenceToMoveId(null);
+      return;
+    }
+    
+    // Adjust targetIndex if moving from before the target to after the target
+    // This logic ensures correct placement when an item is removed and then re-inserted
+    if (sourceIndex < finalTargetIndex) {
+        newSelectedSentences.splice(finalTargetIndex, 0, movedSentence);
+    } else {
+        newSelectedSentences.splice(finalTargetIndex, 0, movedSentence);
     }
 
-    // Reset all touch drag states
-    setTouchDraggingIndex(null);
-    setTouchStartCoords({ x: 0, y: 0 });
-    setTouchCurrentCoords({ x: 0, y: 0 });
-    setIsTouchDragging(false);
-    setDragOverItemIndex(null); // Reset drag over visual
 
-    // Remove global listeners
-    document.removeEventListener('touchmove', handleTouchMove);
-    document.removeEventListener('touchend', handleTouchEnd);
-    document.removeEventListener('touchcancel', handleTouchEnd);
+    setSelectedSentencesData(newSelectedSentences);
+    setSentenceToMoveId(null); // Exit move mode
   };
-  // --- End Touch Drag and Drop Handlers ---
+
+  const handleCancelMove = () => {
+    setSentenceToMoveId(null);
+  };
+
+  const sentenceToMoveOriginalIndex = selectedSentencesData.findIndex(s => s.id === sentenceToMoveId);
+
+  // --- End Two-Step Move Logic ---
 
 
   // Filter sentences based on search term
@@ -625,7 +553,7 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 font-sans text-gray-900 p-4 sm:p-6 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to indigo-100 font-sans text-gray-900 p-4 sm:p-6 md:p-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-4xl font-extrabold text-center text-blue-800 mb-8 drop-shadow-sm">
           Script Generator
@@ -701,11 +629,32 @@ function App() {
                 )}
               </div>
 
-              {/* Customize Selected Sentences individually - MOVED HERE */}
+              {/* Customize Selected Sentences individually */}
               {selectedSentencesData.length > 0 && (
                 <div className="mt-6 p-4 border border-blue-300 bg-blue-50 rounded-lg shadow-inner">
                   <h3 className="text-xl font-semibold text-blue-900 mb-3">Customize Selected Sentences:</h3>
+                  {sentenceToMoveId && (
+                    <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded-md text-center text-yellow-800 font-medium">
+                      Tap a gray bubble below to move the highlighted sentence, or click "Cancel Move".
+                      <button
+                        onClick={handleCancelMove}
+                        className="ml-4 px-3 py-1 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 text-sm font-bold"
+                      >
+                        Cancel Move
+                      </button>
+                    </div>
+                  )}
                   <ul className="space-y-3">
+                    {/* Render a drop target at the very beginning if in move mode */}
+                    {sentenceToMoveId !== null && sentenceToMoveOriginalIndex !== 0 && (
+                        <li
+                            className="p-3 rounded-md border border-dashed border-gray-400 bg-gray-100 text-gray-500 text-center cursor-pointer hover:bg-gray-200"
+                            onClick={() => handleDropSentence(null, 0)}
+                        >
+                            Place here
+                        </li>
+                    )}
+
                     {selectedSentencesData.map((selected, index) => {
                       const sentenceTemplate = sentenceBank.find(s => s.id === selected.id);
                       if (!sentenceTemplate) return null;
@@ -713,56 +662,69 @@ function App() {
                       const hasPercentage = sentenceTemplate.text.includes('[PERCENTAGE]');
                       const parts = hasPercentage ? sentenceTemplate.text.split('[PERCENTAGE]') : [sentenceTemplate.text];
 
+                      // Conditionally apply opacity and pointer-events for the item being moved
+                      const isMovingItem = sentenceToMoveId && selected.id === sentenceToMoveId;
+                      const listItemClasses = `flex items-center bg-white p-3 rounded-md shadow-sm border border-gray-200 customize-selected-sentence-item ${
+                          isMovingItem ? 'opacity-0 pointer-events-none' : '' // Make it invisible and non-interactive
+                      }`;
+
                       return (
-                        <li
-                          key={selected.id} // Use unique ID for key
-                          data-id={selected.id} // Add data-id for easier lookup in touch events
-                          draggable="true" // Keep for mouse drag
-                          onDragStart={(e) => handleDragStart(e, index)}
-                          onDragEnter={(e) => handleDragEnter(e, index)}
-                          onDragLeave={(e) => setDragOverItemIndex(null)} // Clear on leave
-                          onDragOver={handleDragOver} // Crucial for drop to work
-                          onDrop={(e) => handleDrop(e, index)}
-                          onDragEnd={handleDragEnd}
-                          // Removed onTouchStart from the li itself
-                          className={`flex items-center bg-white p-3 rounded-md shadow-sm border border-gray-200 customize-selected-sentence-item
-                            ${(draggedItemIndex === index || touchDraggingIndex === index) ? 'opacity-50' : ''}
-                            ${dragOverItemIndex === index && (draggedItemIndex !== index && touchDraggingIndex !== index) ? 'border-2 border-blue-500 bg-blue-50' : ''}
-                          `}
-                          ref={el => touchListItemRefs.current[index] = el} // Store ref for each item
-                          style={{ touchAction: 'none' }} // Prevent default touch actions on the list item itself
-                        >
-                          <span className="text-gray-800 flex-grow">
-                            {parts[0]}
-                            {hasPercentage && (
-                              <input
-                                type="number"
-                                className="inline-block w-20 p-1 mx-2 border border-blue-400 rounded-md text-center text-blue-800 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out"
-                                placeholder="e.g., 80"
-                                value={selected.percentage}
-                                onChange={(e) => updateSelectedSentencePercentage(selected.id, e.target.value)}
-                                min="0"
-                                max="100"
-                              />
+                        <React.Fragment key={selected.id}>
+                            <li
+                                className={listItemClasses}
+                                // Only allow click to drop if in move mode. Otherwise, no action on click.
+                                onClick={sentenceToMoveId !== null ? () => handleDropSentence(selected.id) : undefined}
+                                // Keep mouse drag-and-drop for desktop
+                                draggable="true"
+                                onDragStart={(e) => handleDragStart(e, index)}
+                                onDragEnter={(e) => handleDragEnter(e, index)}
+                                onDragLeave={(e) => setDragOverItemIndex(null)}
+                                onDragOver={handleDragOver}
+                                onDrop={(e) => handleDrop(e, index)}
+                                onDragEnd={handleDragEnd}
+                            >
+                                <span className="text-gray-800 flex-grow">
+                                    {parts[0]}
+                                    {hasPercentage && (
+                                        <input
+                                            type="number"
+                                            className="inline-block w-20 p-1 mx-2 border border-blue-400 rounded-md text-center text-blue-800 font-semibold focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 ease-in-out"
+                                            placeholder="e.g., 80"
+                                            value={selected.percentage}
+                                            onChange={(e) => updateSelectedSentencePercentage(selected.id, e.target.value)}
+                                            min="0"
+                                            max="100"
+                                            onClick={e => e.stopPropagation()} // Prevent list item click when interacting with input
+                                        />
+                                    )}
+                                    {parts[1]}
+                                </span>
+                                {/* Move Button */}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleMoveClick(selected.id); }}
+                                    className={`ml-2 px-3 py-1 rounded-md text-sm font-bold transition duration-200 ease-in-out
+                                        ${sentenceToMoveId === selected.id ? 'bg-yellow-500 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}
+                                    `}
+                                >
+                                    {sentenceToMoveId === selected.id ? 'Moving...' : 'Move'}
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); toggleSentenceSelection(selected.id); }}
+                                    className="ml-2 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-bold hover:bg-red-600 transition duration-200 ease-in-out"
+                                >
+                                    &times;
+                                </button>
+                            </li>
+                            {/* Render a drop target AFTER each item if in move mode */}
+                            {sentenceToMoveId !== null && sentenceToMoveOriginalIndex !== index + 1 && (
+                                <li
+                                    className="p-3 rounded-md border border-dashed border-gray-400 bg-gray-100 text-gray-500 text-center cursor-pointer hover:bg-gray-200"
+                                    onClick={() => handleDropSentence(null, index + 1)}
+                                >
+                                    Place here
+                                </li>
                             )}
-                            {parts[1]}
-                          </span>
-                          {/* Grab Handle for Touch Drag */}
-                          <div
-                            className="ml-2 px-2 py-1 bg-gray-200 rounded-md cursor-grab text-gray-600 flex flex-col items-center justify-center"
-                            onTouchStart={(e) => handleGrabHandleTouchStart(e, index)}
-                            style={{ touchAction: 'none' }} // Prevent default browser touch actions on the handle
-                          >
-                            <span className="text-xs leading-none">•••</span>
-                            <span className="text-xs leading-none">•••</span>
-                          </div>
-                          <button
-                            onClick={() => toggleSentenceSelection(selected.id)}
-                            className="ml-2 px-3 py-1 bg-red-500 text-white rounded-full text-sm font-bold hover:bg-red-600 transition duration-200 ease-in-out"
-                          >
-                            &times;
-                          </button>
-                        </li>
+                        </React.Fragment>
                       );
                     })}
                   </ul>
