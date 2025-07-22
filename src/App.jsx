@@ -89,12 +89,13 @@ const CustomModal = ({ message, onClose, onConfirm, showConfirmButton = false, c
 };
 
 // --- Component for the "Manage Sentences" View ---
-const ManageSentencesView = ({ sentenceBank, onAddSentence, onDeleteSentence, onGoBack }) => {
+const ManageSentencesView = ({ sentenceBank, onAddSentence, onDeleteSentence, onGoBack, onExportSentences, onImportSentences }) => {
   const [newSentenceText, setNewSentenceText] = useState('');
   const [modalMessage, setModalMessage] = useState(null);
   const [sentenceToDelete, setSentenceToDelete] = useState(null); // State to hold sentence ID for confirmation
   const [showPunctuationWarningModal, setShowPunctuationWarningModal] = useState(false); // New state for punctuation warning
   const textareaRef = useRef(null); // Ref for the textarea
+  const fileInputRef = useRef(null); // Ref for the file input for import
 
   const handleAddClick = () => {
     if (newSentenceText.trim()) {
@@ -153,6 +154,35 @@ const ManageSentencesView = ({ sentenceBank, onAddSentence, onDeleteSentence, on
     }
   };
 
+  // Handle file selection for import
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          // Basic validation: Check if it's an array and each item has 'id' and 'text'
+          if (Array.isArray(importedData) && importedData.every(item => typeof item.id === 'string' && typeof item.text === 'string')) {
+            onImportSentences(importedData);
+            setModalMessage('Sentences imported successfully!');
+          } else {
+            setModalMessage('Invalid file format. Please upload a JSON file with an array of objects, each having "id" and "text" properties.');
+          }
+        } catch (error) {
+          setModalMessage('Error parsing JSON file. Please ensure it is a valid JSON.');
+          console.error("Error importing sentences:", error);
+        }
+      };
+      reader.readAsText(file);
+    }
+    // Reset the file input value to allow importing the same file again if needed
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+
   return (
     <div className="flex flex-col items-center p-6 bg-white rounded-lg shadow-lg max-w-2xl mx-auto my-8">
       <h2 className="text-2xl font-semibold mb-4 text-gray-800">Manage Sentence Templates</h2>
@@ -202,6 +232,26 @@ const ManageSentencesView = ({ sentenceBank, onAddSentence, onDeleteSentence, on
         ) : (
           <p className="text-center text-gray-500 py-4">No sentences added yet.</p>
         )}
+      </div>
+
+      {/* Export/Import Buttons */}
+      <div className="w-full mb-8 p-4 border border-gray-200 rounded-lg bg-gray-50 flex flex-col sm:flex-row justify-around items-center space-y-4 sm:space-y-0 sm:space-x-4">
+        <button
+          onClick={onExportSentences}
+          className="w-full sm:w-auto px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-200 ease-in-out"
+        >
+          Export Sentences (JSON)
+        </button>
+        <label className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-200 ease-in-out cursor-pointer text-center">
+          Import Sentences (JSON)
+          <input
+            type="file"
+            accept=".json"
+            onChange={handleFileChange}
+            ref={fileInputRef}
+            className="hidden"
+          />
+        </label>
       </div>
 
 
@@ -274,7 +324,7 @@ function App() {
   // State to manage the sentence being moved in two-step process
   const [sentenceToMoveId, setSentenceToMoveId] = useState(null);
 
-  // States for mouse drag and drop (re-added)
+  // States for mouse drag and drop
   const [draggedItemIndex, setDraggedItemIndex] = useState(null);
   const [dragOverItemIndex, setDragOverItemIndex] = useState(null);
 
@@ -444,7 +494,7 @@ function App() {
     );
   };
 
-  // --- Mouse Drag and Drop Handlers (re-added) ---
+  // --- Mouse Drag and Drop Handlers ---
   const handleDragStart = (e, index) => {
     setDraggedItemIndex(index);
     e.dataTransfer.effectAllowed = 'move';
@@ -544,7 +594,27 @@ function App() {
 
   const sentenceToMoveOriginalIndex = selectedSentencesData.findIndex(s => s.id === sentenceToMoveId);
 
-  // --- End Two-Step Move Logic ---
+  // --- Export/Import Logic ---
+  const handleExportSentences = () => {
+    const dataStr = JSON.stringify(sentenceBank, null, 2); // Pretty print JSON
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'script_sentences_backup.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setModalMessage('Sentences exported successfully as JSON!');
+  };
+
+  const handleImportSentences = (importedData) => {
+    // Clear existing sentences and add imported ones
+    setSentenceBank(importedData);
+    // Also clear selected sentences to avoid issues with old IDs
+    setSelectedSentencesData([]);
+  };
 
 
   // Filter sentences based on search term
@@ -673,7 +743,7 @@ function App() {
                             <li
                                 className={listItemClasses}
                                 // Only allow click to drop if in move mode. Otherwise, no action on click.
-                                onClick={sentenceToMoveId !== null ? () => handleDropSentence(selected.id) : undefined}
+                                onClick={sentenceToMoveId !== null ? (e) => { e.stopPropagation(); handleDropSentence(selected.id); } : undefined}
                                 // Keep mouse drag-and-drop for desktop
                                 draggable="true"
                                 onDragStart={(e) => handleDragStart(e, index)}
@@ -771,6 +841,8 @@ function App() {
             onAddSentence={handleAddSentence}
             onDeleteSentence={handleDeleteSentence}
             onGoBack={() => setCurrentView('main')}
+            onExportSentences={handleExportSentences}
+            onImportSentences={handleImportSentences}
           />
         )}
 
@@ -798,4 +870,5 @@ function App() {
 }
 
 export default App;
+
 
