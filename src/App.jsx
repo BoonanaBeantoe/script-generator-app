@@ -56,8 +56,8 @@ const initialSentenceBank = [
 
 // --- Predefined Session Context Options ---
 const sessionContextOptions = {
-  oneToOne: "The 1:1 ABA direct therapy session had the following present: the client (Ariana 7 year-old-female), mom, sister, and RBT (Steven Cobleigh). RBT met with client at the client's house.",
-  withSupervision: "The ABA therapy session, with supervision, had the following present: the client (Ariana 7 year-old-female), mom, sister, uncle, RBT (Steven Cobleigh), and BCBA (Jennifer Smith). RBT met with client at the client's house."
+  oneToOne: "The 1:1 ABA direct therapy session had the following present: the client (Ariana 8 year-old-female), mom, sister, and RBT (Steven Cobleigh). RBT met with client at the client's house.",
+  withSupervision: "The ABA therapy session, with supervision, had the following present: the client (Ariana 8 year-old-female), mom, sister, uncle, RBT (Steven Cobleigh), and BCBA (Jennifer Smith). RBT met with client at the client's house."
 };
 
 
